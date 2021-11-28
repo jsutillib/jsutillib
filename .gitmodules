@@ -1,9 +1,12 @@
 [submodule "globals"]
 	path = globals
 	url = git@github.com:jsutillib/globals.git
+	update = merge
 [submodule "common"]
 	path = common
 	url = git@github.com:jsutillib/common.git
+	update = merge
 [submodule "selection"]
 	path = selection
 	url = git@github.com:jsutillib/selection.git
+	update = merge
