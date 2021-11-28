@@ -4,3 +4,6 @@
 [submodule "common"]
 	path = common
 	url = git@github.com:jsutillib/common.git
+[submodule "selection"]
+	path = selection
+	url = git@github.com:jsutillib/selection.git
