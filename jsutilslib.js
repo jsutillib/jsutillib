@@ -16,8 +16,8 @@
 
 (function(exports, document) {
     "use strict";
-    if (exports.jsutils === undefined) {
-        exports.jsutils = {};
+    if (exports.jsutillib === undefined) {
+        exports.jsutillib = {};
     }
     Array.prototype._trim = function() {
         return this.filter(function(e) {
@@ -96,16 +96,16 @@
     function clone(target, objectfnc = x => clone(x)) {
         return processprops(target, objectfnc, true);
     }
-    exports.jsutils.tag = tag;
-    exports.jsutils.merge = merge;
-    exports.jsutils.clone = clone;
-    exports.jsutils.processprops = processprops;
+    exports.jsutillib.tag = tag;
+    exports.jsutillib.merge = merge;
+    exports.jsutillib.clone = clone;
+    exports.jsutillib.processprops = processprops;
 })(window, document);
 
 (function(exports, document) {
     "use strict";
-    if (exports.jsutils === undefined) {
-        exports.jsutils = {};
+    if (exports.jsutillib === undefined) {
+        exports.jsutillib = {};
     }
     function grabbable(el, options = {}) {
         if (options === false) {
@@ -226,13 +226,13 @@
         });
         return el;
     }
-    exports.jsutils.grabbable = grabbable;
+    exports.jsutillib.grabbable = grabbable;
 })(window, document);
 
 (function(exports, document) {
     "use strict";
-    if (exports.jsutils === undefined) {
-        exports.jsutils = {};
+    if (exports.jsutillib === undefined) {
+        exports.jsutillib = {};
     }
     function selectable(el, options = {}) {
         if (options === false) {
@@ -405,13 +405,13 @@
         });
         return el;
     }
-    exports.jsutils.selectable = selectable;
+    exports.jsutillib.selectable = selectable;
 })(window, document);
 
 (function(exports, document) {
     "use strict";
-    if (exports.jsutils === undefined) {
-        exports.jsutils = {};
+    if (exports.jsutillib === undefined) {
+        exports.jsutillib = {};
     }
     function sizable(el, options = {}) {
         if (options === false) {
@@ -621,13 +621,13 @@
             this._sizable.activate();
         });
     }
-    exports.jsutils.sizable = sizable;
+    exports.jsutillib.sizable = sizable;
 })(window, document);
 
 (function(exports, document) {
     "use strict";
-    if (exports.jsutils === undefined) {
-        exports.jsutils = {};
+    if (exports.jsutillib === undefined) {
+        exports.jsutillib = {};
     }
     function is_proxy(p) {
         return typeof p === "object" && p.is_proxy === true;
@@ -724,7 +724,7 @@
             });
         }
     }
-    let VariableListener = (original, options = {}) => {
+    let WatchedVariable = (original, options = {}) => {
         let defaults = {
             listenonchildren: true,
             eventtarget: [ window ],
@@ -732,7 +732,7 @@
             cloneobjects: false,
             convertproperties: true
         };
-        let settings = jsutils.merge(defaults, options);
+        let settings = jsutillib.merge(defaults, options);
         if (!Array.isArray(settings.eventtarget)) {
             settings.eventtarget = [ settings.eventtarget ];
         }
@@ -742,12 +742,12 @@
                 if (settings.convertproperties) {
                     let tranformfnc = x => x;
                     if (settings.cloneobjects) {
-                        tranformfnc = jsutils.clone;
+                        tranformfnc = jsutillib.clone;
                     }
-                    value = jsutils.processprops(value, function(x) {
+                    value = jsutillib.processprops(value, function(x) {
                         let mychildren = [];
                         if (Array.isArray(x)) {
-                            x = x.map(y => VariableListener(tranformfnc(y), settings));
+                            x = x.map(y => WatchedVariable(tranformfnc(y), settings));
                             x.forEach(y => mychildren.push(y.listener));
                         }
                         let clonedprop = convertobject(tranformfnc(x), settings);
@@ -758,7 +758,7 @@
                         return clonedprop;
                     }, settings.cloneobjects);
                 }
-                value = VariableListener(value, settings);
+                value = WatchedVariable(value, settings);
                 value.listener.__parent = proxy;
                 children.forEach(child => {
                     child.__parent = value;
@@ -781,7 +781,7 @@
 
                   case "value":
                     return function() {
-                        return jsutils.clone(target, function(x) {
+                        return jsutillib.clone(target, function(x) {
                             if (is_proxy(x)) {
                                 return x.object();
                             }
@@ -818,16 +818,16 @@
         });
         return proxy;
     };
-    exports._GLOBALS = VariableListener({});
-    exports.jsutils.VariableListener = VariableListener;
+    exports._GLOBALS = WatchedVariable({});
+    exports.jsutillib.WatchedVariable = WatchedVariable;
 })(window, document);
 
 (function($) {
     "use strict";
-    if ($.fn.jsutils === undefined) {
-        $.fn.jsutils = {};
+    if ($.fn.jsutillib === undefined) {
+        $.fn.jsutillib = {};
     }
-    $.fn.jsutils.getVersion = function() {
+    $.fn.jsutillib.getVersion = function() {
         return "1.0.0-beta";
     };
 })(jQuery);
