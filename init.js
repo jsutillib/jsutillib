@@ -16,10 +16,10 @@
 
 (function ($) {
     "use strict";
-    if ($.fn.jsutils === undefined) {
-        $.fn.jsutils = {};
+    if ($.fn.jsutilslib === undefined) {
+        $.fn.jsutilslib = {};
     }
-    $.fn.jsutils.getVersion = function() {
+    $.fn.jsutilslib.getVersion = function() {
         return "1.0.0-beta";
     }
 })(jQuery);
