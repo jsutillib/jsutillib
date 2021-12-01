@@ -14,16 +14,26 @@
    limitations under the License.
 */
 
+(function($) {
+    "use strict";
+    if ($.fn.jsutilslib === undefined) {
+        $.fn.jsutilslib = {};
+    }
+    $.fn.jsutilslib.getVersion = function() {
+        return "1.0.0-beta";
+    };
+})(jQuery);
+
 (function(exports, document) {
     "use strict";
-    if (exports.jsutillib === undefined) {
-        exports.jsutillib = {};
+    if (exports.jsutilslib === undefined) {
+        exports.jsutilslib = {};
     }
-    Array.prototype._trim = function() {
-        return this.filter(function(e) {
+    function arraytrim(array) {
+        return array.filter(function(e) {
             return `${e}`.trim() !== "";
         });
-    };
+    }
     Element.prototype._append = function(...args) {
         this.append(...args);
         return this;
@@ -53,7 +63,7 @@
         if (id !== null) {
             props.id = id;
         }
-        props.className = [ props.className, ...parts.slice(1) ]._trim().join(" ").trim();
+        props.className = arraytrim([ props.className, ...parts.slice(1) ]).join(" ").trim();
         let el = document.createElement(tag);
         for (let prop in props) {
             if (el[prop] !== undefined) {
@@ -96,16 +106,17 @@
     function clone(target, objectfnc = x => clone(x)) {
         return processprops(target, objectfnc, true);
     }
-    exports.jsutillib.tag = tag;
-    exports.jsutillib.merge = merge;
-    exports.jsutillib.clone = clone;
-    exports.jsutillib.processprops = processprops;
+    exports.jsutilslib.arraytrim = arraytrim;
+    exports.jsutilslib.tag = tag;
+    exports.jsutilslib.merge = merge;
+    exports.jsutilslib.clone = clone;
+    exports.jsutilslib.processprops = processprops;
 })(window, document);
 
 (function(exports, document) {
     "use strict";
-    if (exports.jsutillib === undefined) {
-        exports.jsutillib = {};
+    if (exports.jsutilslib === undefined) {
+        exports.jsutilslib = {};
     }
     function grabbable(el, options = {}) {
         if (options === false) {
@@ -226,13 +237,13 @@
         });
         return el;
     }
-    exports.jsutillib.grabbable = grabbable;
+    exports.jsutilslib.grabbable = grabbable;
 })(window, document);
 
 (function(exports, document) {
     "use strict";
-    if (exports.jsutillib === undefined) {
-        exports.jsutillib = {};
+    if (exports.jsutilslib === undefined) {
+        exports.jsutilslib = {};
     }
     function selectable(el, options = {}) {
         if (options === false) {
@@ -405,13 +416,13 @@
         });
         return el;
     }
-    exports.jsutillib.selectable = selectable;
+    exports.jsutilslib.selectable = selectable;
 })(window, document);
 
 (function(exports, document) {
     "use strict";
-    if (exports.jsutillib === undefined) {
-        exports.jsutillib = {};
+    if (exports.jsutilslib === undefined) {
+        exports.jsutilslib = {};
     }
     function sizable(el, options = {}) {
         if (options === false) {
@@ -621,38 +632,58 @@
             this._sizable.activate();
         });
     }
-    exports.jsutillib.sizable = sizable;
+    exports.jsutilslib.sizable = sizable;
 })(window, document);
 
-(function(exports, document) {
+(function(exports) {
     "use strict";
-    if (exports.jsutillib === undefined) {
-        exports.jsutillib = {};
+    if (exports.jsutilslib === undefined) {
+        exports.jsutilslib = {};
     }
     function is_proxy(p) {
-        return typeof p === "object" && p.is_proxy === true;
+        return p !== null && typeof p === "object" && p.is_proxy !== undefined;
     }
-    class ListenerController {
-        static subscriptions = {};
-        constructor(proxy, target, settings) {
-            this.__proxy = proxy;
-            this.__target = target;
+    class WatchController {
+        constructor(settings, subscriptions) {
+            this.__subscriptions = subscriptions;
             this.__settings = Object.assign({}, settings);
             this.__event_listeners = [];
             this.__parent = null;
         }
-        __fire_events(name, value, suffix = "") {
-            if (is_proxy(name)) {
+        set_proxy(proxy, target) {
+            this.__proxy = proxy;
+            this.__target = target;
+        }
+        get_proxy_tree(name = null, value = null) {
+            if (name === null) {
                 for (let prop in this.__target) {
-                    if (this.__target[prop] === name) {
+                    if (this.__target[prop] === value) {
                         name = prop;
-                        value = this.__proxy[prop];
+                        break;
                     }
                 }
+                if (name === null) {
+                    throw new Error(`Could not find the value in the properties of the proxy`);
+                }
+            } else {}
+            if (this.__parent !== null) {
+                return [ ...this.__parent.watcher.get_proxy_tree(null, this.__proxy), {
+                    p: this.__proxy,
+                    n: name
+                } ];
+            } else {
+                return [ {
+                    p: this.__proxy,
+                    n: name
+                } ];
             }
+        }
+        __fire_events(name, value) {
+            let proxy_tree = this.get_proxy_tree(name, value);
+            let triggerer = proxy_tree.map(x => x.n).join(".");
             let e = new CustomEvent(this.__settings.eventtype, {
                 detail: {
-                    name: name,
+                    var: triggerer,
                     value: value
                 }
             });
@@ -660,27 +691,66 @@
             this.__settings.eventtarget.forEach(et => {
                 et.dispatchEvent(e);
             });
-            let varname = name;
-            if (this.__parent !== null) {
-                varname = this.__parent.listener.__fire_events(this.__proxy, undefined, `.${name}${suffix}`);
-                varname = `${varname}.${name}`;
+            this.notify(proxy_tree);
+        }
+        notify(proxy_tree, e = null) {
+            let var_fqn = proxy_tree.map(x => x.n).join(".");
+            let var_name = proxy_tree[proxy_tree.length - 1].n;
+            let proxy = this.__proxy;
+            proxy_tree.pop();
+            let bubblemanager = true;
+            if (e === null) {
+                e = {
+                    target: proxy,
+                    type: "change",
+                    from: var_fqn,
+                    cancelled: false
+                };
+            } else {
+                bubblemanager = false;
             }
-            this.notify(varname, value, `${name}${suffix}`);
-            return varname;
+            let event = {
+                event: e,
+                variable: var_name,
+                fqvn: var_fqn,
+                value: proxy[var_name],
+                stopPropagation: function() {
+                    e.cancelled = true;
+                }
+            };
+            let subscriptions = this.get_parent_subscriptions();
+            for (let k in subscriptions) {
+                let subscription = subscriptions[k];
+                if (subscription.re.test(var_fqn)) {
+                    subscription.callbacks.forEach(function(sub) {
+                        if (e.cancelled) {
+                            return;
+                        }
+                        sub.callback.call(proxy, event);
+                    });
+                    if (bubblemanager && this.__settings.propagatechanges === true) {
+                        for (let i = proxy_tree.length; !e.cancelled && i > 0; i--) {
+                            let c_proxy = proxy_tree[i - 1].p;
+                            c_proxy.watcher.notify(proxy_tree, e);
+                        }
+                    }
+                }
+                if (e.cancelled) {
+                    break;
+                }
+            }
         }
         addEventListener(type, eventHandler) {
-            var listener = {};
-            listener.type = type;
-            listener.eventHandler = eventHandler;
-            this.__event_listeners.push(listener);
+            this.__event_listeners.push({
+                type: type,
+                eventHandler: eventHandler
+            });
         }
         dispatchEvent(event) {
-            if (event.cancelBubble) {
-                return;
-            }
+            let proxy = this.__proxy;
             this.__event_listeners.forEach(listener => {
                 if (listener.type === event.type) {
-                    listener.eventHandler(event);
+                    listener.eventHandler.call(proxy, event);
                 }
             });
         }
@@ -689,99 +759,98 @@
                 return listener.type !== type || listener.eventHandler !== eventHandler;
             });
         }
-        notify(varname, value, from) {
-            for (let k in ListenerController.subscriptions) {
-                let subscription = ListenerController.subscriptions[k];
-                if (subscription.re.test(varname)) {
-                    subscription.callbacks.forEach(sub => {
-                        sub(varname, value, from);
-                    });
-                }
+        get_parent_subscriptions() {
+            if (this.__parent === null) {
+                return this.__subscriptions;
             }
+            return Object.assign({}, this.__subscriptions, this.__parent.watcher.get_parent_subscriptions());
         }
-        listen(varnames, eventHandler) {
+        watch(varnames, event_handler, autocancel = false) {
             if (!Array.isArray(varnames)) {
                 varnames = [ varnames ];
             }
             varnames.forEach(function(varname) {
-                if (ListenerController.subscriptions[varname] === undefined) {
+                if (varname === "") {
+                    varname = "*";
+                }
+                if (this.__subscriptions[varname] === undefined) {
                     let re = varname.replace(".", "\\.").replace("*", ".*").replace("?", "[^.]*");
                     re = `^${re}$`;
-                    ListenerController.subscriptions[varname] = {
+                    this.__subscriptions[varname] = {
                         re: new RegExp(re),
                         callbacks: []
                     };
                 }
-                ListenerController.subscriptions[varname].callbacks.push(eventHandler);
-            });
+                this.__subscriptions[varname].callbacks.push({
+                    callback: event_handler,
+                    autocancel: autocancel
+                });
+            }.bind(this));
         }
-        unlisten(varname, eventHandler) {
-            if (ListenerController.subscriptions[varname] === undefined) {
+        unwatch(varname, eventHandler) {
+            if (this.__subscriptions[varname] === undefined) {
                 return;
             }
-            ListenerController.subscriptions[varname].callbacks.filter(function(e) {
+            this.__subscriptions[varname].callbacks.filter(function(e) {
                 return e !== eventHandler;
             });
         }
     }
-    let WatchedVariable = (original, options = {}) => {
+    let WatchedObject = (original = {}, options = {}) => {
+        if (original === null) {
+            return null;
+        }
+        if (typeof original !== "object") {
+            return original;
+        }
         let defaults = {
-            listenonchildren: true,
-            eventtarget: [ window ],
-            eventtype: "update-variable",
+            propertiesdepth: -1,
             cloneobjects: false,
-            convertproperties: true
+            propagatechanges: false,
+            eventtarget: [ window ],
+            eventtype: "watch"
         };
-        let settings = jsutillib.merge(defaults, options);
+        let settings = jsutilslib.merge(defaults, options);
         if (!Array.isArray(settings.eventtarget)) {
             settings.eventtarget = [ settings.eventtarget ];
         }
-        function convertobject(value, settings) {
-            if (typeof value === "object") {
-                let children = [];
-                if (settings.convertproperties) {
-                    let tranformfnc = x => x;
-                    if (settings.cloneobjects) {
-                        tranformfnc = jsutillib.clone;
-                    }
-                    value = jsutillib.processprops(value, function(x) {
-                        let mychildren = [];
-                        if (Array.isArray(x)) {
-                            x = x.map(y => WatchedVariable(tranformfnc(y), settings));
-                            x.forEach(y => mychildren.push(y.listener));
-                        }
-                        let clonedprop = convertobject(tranformfnc(x), settings);
-                        if (clonedprop.is_proxy !== undefined) children.push(clonedprop.listener);
-                        mychildren.forEach(child => {
-                            child.__parent = clonedprop;
-                        });
-                        return clonedprop;
-                    }, settings.cloneobjects);
-                }
-                value = WatchedVariable(value, settings);
-                value.listener.__parent = proxy;
-                children.forEach(child => {
-                    child.__parent = value;
-                });
-            } else {}
-            return value;
+        let subscriptions = {};
+        let watcher = new WatchController(settings, subscriptions);
+        let children = [];
+        if (settings.cloneobjects) {
+            original = jsutilslib.clone(original);
         }
-        let listener = null;
+        if (settings.propertiesdepth !== 0) {
+            let propsettings = settings;
+            if (settings.propertiesdepth > 0) {
+                propsettings = jsutilslib.merge(settings, {
+                    propertiesdepth: settings.propertiesdepth - 1
+                });
+            }
+            function convertproperty(x) {
+                let clonedprop = WatchedObject(x, propsettings);
+                if (clonedprop.is_proxy !== undefined) children.push(clonedprop.watcher);
+                return clonedprop;
+            }
+            if (Array.isArray(original)) {
+                original = original.map(convertproperty);
+            } else {
+                jsutilslib.processprops(original, convertproperty);
+            }
+        }
         let proxy = new Proxy(original, {
             get(target, name, receiver) {
-                if (listener === null) {
-                    listener = new ListenerController(proxy, target, settings);
-                }
+                watcher.set_proxy(proxy, target);
                 switch (name) {
                   case "is_proxy":
                     return true;
 
-                  case "listener":
-                    return listener;
+                  case "watcher":
+                    return watcher;
 
                   case "value":
                     return function() {
-                        return jsutillib.clone(target, function(x) {
+                        return jsutilslib.clone(target, function(x) {
                             if (is_proxy(x)) {
                                 return x.object();
                             }
@@ -794,40 +863,32 @@
                         return target;
                     };
                 }
-                if ([ "listen", "unlisten", "addEventListener", "removeEventListener", "dispatchEvent" ].includes(name)) {
-                    return listener[name].bind(listener);
+                if ([ "watch", "unwatch", "addEventListener", "removeEventListener", "dispatchEvent" ].includes(name)) {
+                    return watcher[name].bind(watcher);
                 }
                 let rv = Reflect.get(target, name, receiver);
                 return rv;
             },
             set(target, name, value, receiver) {
-                if (listener === null) {
-                    listener = new ListenerController(proxy, target, settings);
-                }
-                let reserved = [ "value", "listener", "is_proxy", "listen", "unlisten", "addEventListener", "removeEventListener", "dispatchEvent" ].includes(name);
+                watcher.set_proxy(proxy, target);
+                let reserved = [ "value", "watcher", "is_proxy", "watch", "unwatch", "addEventListener", "removeEventListener", "dispatchEvent" ].includes(name);
                 if (reserved) {
                     throw new Exception("invalid keyword");
                 }
-                if (settings.listenonchildren) {
-                    value = convertobject(value, settings);
+                value = WatchedObject(value, settings);
+                if (is_proxy(value)) {
+                    value.watcher.__parent = proxy;
                 }
                 let retval = Reflect.set(target, name, value, receiver);
-                listener.__fire_events(name, value);
+                watcher.__fire_events(name, value);
                 return retval;
             }
         });
+        children.forEach(child => {
+            child.__parent = proxy;
+        });
         return proxy;
     };
-    exports._GLOBALS = WatchedVariable({});
-    exports.jsutillib.WatchedVariable = WatchedVariable;
-})(window, document);
-
-(function($) {
-    "use strict";
-    if ($.fn.jsutillib === undefined) {
-        $.fn.jsutillib = {};
-    }
-    $.fn.jsutillib.getVersion = function() {
-        return "1.0.0-beta";
-    };
-})(jQuery);
+    exports.$watched = WatchedObject({});
+    exports.jsutilslib.WatchedObject = WatchedObject;
+})(window);
