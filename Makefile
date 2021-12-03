@@ -1,5 +1,5 @@
 LIBNAME=jsutilslib
-SUBDIRS:=common selection watchedobject
+SUBDIRS:=common selection activeobject
 
 FILES_JS:=$(foreach S, $(SUBDIRS), $(addprefix $(S)/, $(S).js))
 FILES_CSS:=$(foreach S, $(SUBDIRS), $(addprefix $(S)/, $(S).css))
